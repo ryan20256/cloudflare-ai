@@ -1,0 +1,17 @@
+name = "cloudflare-ai"
+
+workers_dev = true
+compatibility_date = "2025-04-12"
+
+main = "index.ts"
+
+# wrangler.toml (wrangler v3.88.0^)
+[observability.logs]
+enabled = true
+
+[ai]
+binding = "AI"
+
+[assets]
+directory = "./logo"
+binding = "ASSETS"

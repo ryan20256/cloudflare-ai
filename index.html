@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI图像生成</title>
+    <link rel="icon" href="/logo.png" type="image/png">
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f5f6fa;
+            color: #222;
+            background-color: oklch(0.95 0.025 112);
+            margin: 0;
+            padding: 0;
+        }
+        #main {
+            max-width: 80%;
+            width: auto;
+            min-width: 320px;
+            margin: 60px auto;
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 1px 8px #9992;
+            padding: 42px 32px 32px 32px;
+        }
+        .center {
+            text-align: center;
+        }
+        h1 {
+            margin-top: 0;
+            color: #333;
+            font-size: 2em;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 12px;
+            margin: 20px 0;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
+        select,
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #a3a300;
+            box-shadow: 0 0 0 2px rgba(163, 163, 0, 0.2);
+        }
+        button {
+            padding: 12px 44px;
+            background: #a3a300;
+            color: #fff;
+            border-radius: 8px;
+            border: none;
+            font-size: 1.2em;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button[disabled] {
+            background: #c6c60a;
+            cursor: not-allowed;
+        }
+        .status {
+            height: 20px;
+            margin-bottom: 30px;
+            min-height: 24px;
+            font-size: 1em;
+        }
+        .rectangle {
+            background: #f2f3f7;
+            border-radius: 12px;
+            margin-top: 30px;
+            padding: 22px 20px;
+        }
+        .button-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+        .random-btn {
+            background: #7a9f13;
+            padding: 12px 20px;
+        }
+        .submit-btn {
+            background: #a3a300;
+        }
+        @media (max-width: 600px) {
+            #main {
+                margin: 20px auto;
+                padding: 30px 20px 20px 20px;
+                border-radius: 15px;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
+            .button-container {
+                flex-direction: column;
+            }
+            button {
+                width: 100%;
+            }
+        }
+        .image-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 0;
+            background-color: #f0f0f0;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            min-height: 256px;
+            max-width: 100%;
+        }
+        .placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #555;
+            font-size: 0.9em;
+            background-color: #000;
+        }
+        #aiImage {
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            object-fit: contain;
+        }
+        .dimension-inputs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .dimension-inputs div {
+            flex: 1;
+        }
+        .dimension-inputs label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #555;
+        }
+        @media (max-width: 600px) {
+            .dimension-inputs {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+        .prompt-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .prompt-inputs div {
+            width: 100%;
+        }
+        .prompt-inputs label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #555;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const submitButton = document.getElementById('submitButton');
+            const statusElement = document.getElementById('status');
+            const imageContainer = document.getElementById('imageContainer');
+            const aiImage = document.getElementById('aiImage');
+            const widthInput = document.getElementById('width');
+            const heightInput = document.getElementById('height');
+            widthInput.value = 512;
+            heightInput.value = 512;
+            function updateImageContainerSize() {
+                const width = parseInt(widthInput.value) || 512;
+                const height = parseInt(heightInput.value) || 512;
+
+                const validWidth = Math.min(Math.max(width, 256), 2048);
+                const validHeight = Math.min(Math.max(height, 256), 2048);
+
+                widthInput.value = validWidth;
+                heightInput.value = validHeight;
+
+                const aspectRatio = validWidth / validHeight;
+                const containerWidth = imageContainer.parentElement.clientWidth - 40;
+
+                const maxDisplayHeight = 500;
+
+                let displayHeight = Math.min(maxDisplayHeight, validHeight);
+                let displayWidth = Math.floor(displayHeight * aspectRatio);
+
+                if (displayWidth > containerWidth) {
+                    displayWidth = containerWidth;
+                    displayHeight = Math.floor(containerWidth / aspectRatio);
+                }
+
+                imageContainer.style.width = displayWidth + 'px';
+                imageContainer.style.height = displayHeight + 'px';
+                imageContainer.style.margin = '20px auto';
+
+                const placeholder = document.querySelector('.placeholder');
+                if (placeholder) {
+                    placeholder.style.width = '100%';
+                    placeholder.style.height = '100%';
+                }
+
+                if (aiImage.src && aiImage.src !== window.location.href) {
+                    aiImage.style.maxWidth = '100%';
+                    aiImage.style.maxHeight = '100%';
+                    aiImage.style.width = 'auto';
+                    aiImage.style.height = 'auto';
+                    aiImage.style.objectFit = 'contain';
+                }
+            }
+            widthInput.addEventListener('change', updateImageContainerSize);
+            heightInput.addEventListener('change', updateImageContainerSize);
+            updateImageContainerSize();
+
+            // 定义不支持参数模型列表
+            const modelParams = {
+                noSizeSupport: ['flux-1-schnell'],
+                noNegativePromptSupport: ['flux-1-schnell'],
+                noGuidanceSupport: ['flux-1-schnell']
+            };
+
+            // 根据模型支持调整页面元素
+            function updateUIBasedOnModel() {
+                const selectedModel = document.getElementById('model').value;
+                const dimensionInputs = document.querySelector('.dimension-inputs');
+                const negativePromptDiv = document.getElementById('negative_prompt').parentElement;
+                const guidanceInputDiv = document.getElementById('guidance').parentElement;
+
+                // 处理自定义尺寸
+                if (modelParams.noSizeSupport.includes(selectedModel)) {
+                    dimensionInputs.style.display = 'none';
+                    if (!document.getElementById('size-notice')) {
+                        const notice = document.createElement('div');
+                        notice.id = 'size-notice';
+                        notice.style.color = '#e67e22';
+                        notice.style.fontSize = '0.8em';
+                        notice.style.marginBottom = '16px';
+                        notice.textContent = '注意：当前选择的模型不支持自定义尺寸，将生成固定尺寸的图像';
+                        dimensionInputs.parentNode.insertBefore(notice, dimensionInputs.nextSibling);
+                    }
+                } else {
+                    dimensionInputs.style.display = 'flex';
+                    const notice = document.getElementById('size-notice');
+                    if (notice) notice.remove();
+                }
+
+                // 处理负面提示词
+                if (modelParams.noNegativePromptSupport.includes(selectedModel)) {
+                    negativePromptDiv.style.display = 'none';
+
+                    if (!document.getElementById('negative-prompt-notice')) {
+                        const notice = document.createElement('div');
+                        notice.id = 'negative-prompt-notice';
+                        notice.style.color = '#e67e22';
+                        notice.style.fontSize = '0.8em';
+                        notice.style.marginBottom = '16px';
+                        notice.textContent = '注意：当前选择的模型不支持负面提示词';
+                        negativePromptDiv.parentNode.insertBefore(notice, negativePromptDiv.nextSibling);
+                    }
+                } else {
+                    negativePromptDiv.style.display = '';
+
+                    const notice = document.getElementById('negative-prompt-notice');
+                    if (notice) notice.remove();
+                }
+
+                // 处理指令遵循度系数
+                if (modelParams.noGuidanceSupport.includes(selectedModel)) {
+                    guidanceInputDiv.style.display = 'none';
+
+                    if (!document.getElementById('guidance-notice')) {
+                        const notice = document.createElement('div');
+                        notice.id = 'guidance-notice';
+                        notice.style.color = '#e67e22';
+                        notice.style.fontSize = '0.8em';
+                        notice.style.marginBottom = '16px';
+                        notice.textContent = '注意：当前选择的模型不支持指令遵循度调整';
+                        guidanceInputDiv.parentNode.insertBefore(notice, guidanceInputDiv.nextSibling);
+                    }
+                } else {
+                    guidanceInputDiv.style.display = '';
+
+                    const notice = document.getElementById('guidance-notice');
+                    if (notice) notice.remove();
+                }
+            }
+            document.getElementById('model').addEventListener('change', updateUIBasedOnModel);
+
+            updateUIBasedOnModel();
+
+            submitButton.addEventListener('click', async function (event) {
+                event.preventDefault();
+                submitButton.disabled = true;
+                submitButton.textContent = '正在生成...';
+                statusElement.textContent = '正在处理请求，请稍候...';
+                const model = document.getElementById('model').value;
+                const prompt = document.getElementById('prompt').value;
+                const negativePrompt = document.getElementById('negative_prompt').value;
+                if (prompt === '') {
+                    statusElement.textContent = '请输入描述词';
+                    submitButton.textContent = '提交';
+                    submitButton.disabled = false;
+                    return;
+                }
+                const blobToBase64 = (blob) => new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onerror = reject;
+                    reader.onload = () => {
+                        resolve(reader.result);
+                    };
+                    reader.readAsDataURL(blob);
+                });
+
+                const currentDomain = window.location.origin;
+                try {
+                    const controller = new AbortController();
+                    const signal = controller.signal;
+                    setTimeout(() => {
+                        controller.abort();
+                    }, 120000); // 120秒超时，其实免费计划最多30秒
+                    statusElement.textContent = '正在生成图像...';
+                    const requestBody = {
+                        'model': model,
+                        'prompt': prompt
+                    };
+                    if (negativePrompt && !modelParams.noSizeSupport.includes(model)) {
+                        requestBody.negative_prompt = negativePrompt;
+                    }
+                    if (!modelParams.noSizeSupport.includes(model)) {
+                        requestBody.width = parseInt(widthInput.value) || 512;
+                        requestBody.height = parseInt(heightInput.value) || 512;
+                    }
+                    if (!modelParams.noGuidanceSupport.includes(model)) {
+                        requestBody.guidance = parseFloat(document.getElementById('guidance').value) || 7.5;
+                    }
+                    const response = await fetch(`${currentDomain}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestBody),
+                        signal: signal
+                    });
+                    if (!response.ok) {
+                        throw new Error(`请求失败：${response.status} ${response.statusText}`);
+                    }
+                    const blob = await response.blob();
+                    if (blob.size === 0) {
+                        throw new Error('服务器返回了空数据');
+                    }
+                    console.log('Received blob:', blob.type, blob.size);
+                    const base64Image = await blobToBase64(blob);
+                    console.log('Base64 image length:', base64Image.length);
+                    const aiImage = document.getElementById('aiImage');
+                    if (!aiImage) {
+                        throw new Error('找不到图像元素');
+                    }
+                    const placeholder = document.querySelector('.placeholder');
+                    if (placeholder) {
+                        placeholder.style.display = 'none';
+                    }
+                    aiImage.onload = function () {
+                        console.log('图像加载成功');
+                        statusElement.textContent = '图像生成成功！';
+                        aiImage.style.display = 'block';
+                        if (placeholder) {
+                            placeholder.style.display = 'none';
+                        }
+                        updateImageContainerSize();
+                    };
+
+                    aiImage.onerror = function (e) {
+                        console.error('图像加载失败', e);
+                        statusElement.textContent = '图像加载失败，请重试';
+                        if (placeholder) {
+                            placeholder.style.display = 'flex';
+                        }
+                        aiImage.style.display = 'none';
+                    };
+
+                    if (placeholder) {
+                        placeholder.style.display = 'flex';
+                    }
+
+                    aiImage.src = base64Image;
+                } catch (error) {
+                    if (error.name === 'AbortError') {
+                        statusElement.textContent = '服务器连接超时，请稍后重试。';
+                    } else {
+                        console.error('Error:', error);
+                        statusElement.textContent = '生成过程中发生错误，请重试。';
+                    }
+                } finally {
+                    submitButton.textContent = '提交';
+                    submitButton.disabled = false;
+                }
+            });
+
+            document.getElementById('randomButton').addEventListener('click', function () {
+                // 随机提示词
+                var prompts = [
+                    '1girl,solo,cute,in glass,atmosphere_X,best quality,beautiful,extremely detailed,masterpiece,very aesthetic',
+                    'a girl,,nahida,light,full body,symbol eye, nahida,1girl,fair_skin,in summer,day,in a meadow,sky,cirrus_fibratus,intense shadows,blonde hair,pleated_dress,collared_shirt,blue eyes,long hair,fang,smile',
+                    '((best quality)), ((masterpiece)),A Chinese couple in Hanfu embracing on an arch bridge, a sky full of rose petals, a romantic atmosphere, a huge moon, colorful clouds, clouds, ethereal, reflections of water, a mirage, a breeze,(Chinese ink style)',
+                    'simple background, flower, signature, no humans, sparkle, leaf, plant, white flower, black background, still life, embroidery',
+                    '1 girl,(orange light effect),hair ornament,jewelry,looking at viewer,flower,floating hair,water,underwater,air bubble,submerged, 80sDBA style',
+                    'masterpiece,best quality,high quality,loli,1girl, solo, long hair, looking at viewer, blush, bangs, thighhighs, dress, ribbon, brown eyes, very long hair, closed mouth, standing, full body, yellow eyes, white hair, short sleeves, outdoors, sky,no shoes, day, puffy sleeves, looking back, cloud, from behind, white dress, white thighhighs, red ribbon, tree, blue sky, puffy short sleeves, petals, cherry blossoms, skirt hold,',
+                    '1 girl,Clothes in the shape of snowflake,render,technology, (best quality) (masterpiece), (highly in detailed), 4K,Official art, unit 8 k wallpaper, ultra detailed, masterpiece, best quality, extremely detailed,CG,low saturation, as style, line art',
+                    'best quality,masterpiece,sculpture,wonderland,,chinese fairy tales,an old man,boiling tea,drink tea,a painting of history floating and curved in the background,mountain,white cloud,chinese style courtyard,pavilion,chinese tea mountains,, Chinese architecture, trees,,white hair ,',
+                    '1 girl, absurdres, arrow_(symbol), ata-zhubo, bicycle, billboard, black_eyes, black_footwear, black_hair, blue_sky, bridge, building, car, cardigan, city, cityscape, commentary_request, crosswalk, day, fire_hydrant, folding_bicycle, grey_cardigan, highres, lamppost, loafers, motor_vehicle, necktie, original, overpass, power_lines, railing, red_necktie, red_skirt, road, road_sign, scenery, school_uniform, shoes, short_hair, sign, skirt, sky, solo, stairs, standing, street, traffic_cone, traffic_light, truck, utility_pole, vending_machine',
+                    '1 girl, solo, elf, golden eyes, glowing eyes, slit_pupils, silver hair, green gradient hair, long hair, blunt bangs, brown capelet, frilled shirt, long sleeves, green brooch, pouch, belt, brown gloves, upper body, (chibi:0.4), (close-up), (broken:1.3),  half-closed eye, expressionless, from side,  depth of field, fallen leaves, side light, gingko, tree, masterpiece,bestquality, line art,',
+                    'flower, outdoors, sky, tree, no humans, window, bird, building, scenery, house,oil painting style',
+                ];
+                var randomIndex = Math.floor(Math.random() * prompts.length);
+                document.getElementById('prompt').value = prompts[randomIndex];
+                document.getElementById('status').textContent = '已随机选择提示词';
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <div id="main">
+        <h1 class="center">AI图像生成</h1>
+
+        <div class="status center" id="status"></div>
+
+        <div class="image-container" id="imageContainer">
+            <div class="placeholder" id="placeholder">
+                <span>图像在这里显示</span>
+            </div>
+            <img id="aiImage" style="display:none;" alt="AI生成的图片">
+        </div>
+
+        <div class="rectangle">
+            <select id="model">
+                <option value="dreamshaper-8-lcm">dreamshaper-8-lcm (优化的照片级真实感模型)</option>
+                <option value="stable-diffusion-xl-base-1.0" selected>stable-diffusion-xl-base-1.0 (高质量通用模型)</option>
+                <option value="stable-diffusion-xl-lightning">stable-diffusion-xl-lightning (快速生成模型)</option>
+                <option value="flux-1-schnell">flux-1-schnell (Black Forest Labs 12B参数模型)</option>
+                <!--<option value="stable-diffusion-v1-5-img2img">stable-diffusion-v1-5-img2img (图像到图像转换模型)</option>
+                <option value="stable-diffusion-v1-5-inpainting">stable-diffusion-v1-5-inpainting (图像修复模型)</option>妈的我搞不懂这鬼玩意怎么附加图片，真是的，有人提PR吗？ -->
+            </select>
+
+            <div class="dimension-inputs">
+                <div>
+                    <label for="width">宽度 (256~2048px)</label>
+                    <input type="number" id="width" min="256" max="2048" value="512" step="64">
+                </div>
+                <div>
+                    <label for="height">高度 (256~2048px)</label>
+                    <input type="number" id="height" min="256" max="2048" value="512" step="64">
+                </div>
+                <div>
+                    <label for="guidance">指令遵循度 (-15~30)</label>
+                    <input type="number" id="guidance" min="-15" max="30" value="7.5" step="0.5">
+                </div>
+            </div>
+
+            <div class="prompt-inputs">
+                <div>
+                    <label for="prompt">提示词</label>
+                    <input type="text" id="prompt" placeholder="请输入提示词...">
+                </div>
+                <div>
+                    <label for="negative_prompt">负面提示词</label>
+                    <input type="text" id="negative_prompt" placeholder="输入要避免的元素，如：模糊, 变形, 低质量...">
+                </div>
+            </div>
+
+            <div class="button-container">
+                <button type="button" class="random-btn" id="randomButton">随机提示词</button>
+                <button type="button" class="submit-btn" id="submitButton">提交</button>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
